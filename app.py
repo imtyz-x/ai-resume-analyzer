@@ -249,6 +249,6 @@ if st.button("🚀 Run Instant ATS Diagnostic", type="primary"):
 # --- 7. FOOTER BRANDING ---
 st.markdown("""
     <div class="custom-footer">
-        Designed & Developed with ❤️ by <b>Inthiyaz</b>
+        Designed & Developed by <b>Inthiyaz</b>
     </div>
 """, unsafe_allow_html=True)
