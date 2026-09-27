@@ -11,7 +11,7 @@ An AI-driven application built using Python, Streamlit, and Google Gemini API th
 ## Tech Stack
 - **Language**: Python
 - **Interface**: Streamlit
-- **LLM Integration**: Google Gemini API (`gemini-2.5-flash` via `google-genai`)
+- **LLM Integration**: groq api
 - **PDF Processing**: PyPDF
 
 ## Running Locally
