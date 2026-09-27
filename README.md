@@ -1,6 +1,6 @@
 # AI Resume Analyzer & ATS Matcher 📄🤖
 
-An AI-driven application built using Python, Streamlit, and Google Gemini API that parses PDF resumes and evaluates alignment against target job descriptions to produce ATS suitability scores and improvement strategies.
+An AI-driven application built using Python, Streamlit, and Groqg API that parses PDF resumes and evaluates alignment against target job descriptions to produce ATS suitability scores and improvement strategies.
 
 ## Features
 - **PDF Text Parsing**: Automated text extraction from PDF documents using `pypdf`.
