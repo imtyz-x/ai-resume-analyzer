@@ -4,9 +4,13 @@ import streamlit as st
 from pypdf import PdfReader
 from groq import Groq
 
-# --- SUPABASE ANALYTICS ---
-from services.analytics import log_analysis_event
-
+# --- ANALYTICS IMPORT ---
+from services.analytics import (
+    log_analysis_event,
+    get_analytics_data,
+    get_analytics_summary,
+    get_daily_usage
+)
 
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(
@@ -16,18 +20,15 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-
 # --- 2. ADVANCED SAAS UI STYLING ---
 st.markdown("""
     <style>
-    /* Dark Theme Core */
     .stApp {
         background-color: #080c14;
         color: #e2e8f0;
         font-family: 'Inter', -apple-system, sans-serif;
     }
 
-    /* Modern Glassmorphic Header */
     .main-header {
         background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 27, 75, 0.9) 50%, rgba(49, 27, 146, 0.9) 100%);
         padding: 2.2rem;
@@ -54,7 +55,6 @@ st.markdown("""
         margin-top: 0.6rem;
     }
 
-    /* Clean User Metric Cards */
     .user-metric-card {
         background: #0f172a;
         padding: 1.25rem;
@@ -78,7 +78,6 @@ st.markdown("""
         margin-top: 4px;
     }
 
-    /* Primary Action Button */
     .stButton>button {
         width: 100%;
         background: linear-gradient(90deg, #2563eb 0%, #4f46e5 100%) !important;
@@ -97,7 +96,6 @@ st.markdown("""
         box-shadow: 0 8px 25px rgba(79, 70, 229, 0.5) !important;
     }
 
-    /* Footer */
     .custom-footer {
         text-align: center;
         padding: 2.5rem 0 1rem 0;
@@ -109,14 +107,10 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-
 # --- 3. SIDEBAR & DEV CONSOLE ---
 with st.sidebar:
     st.title("⚙️ Engine Hub")
-    st.info(
-        "💡 Upload your PDF resume and paste the target job description "
-        "to run an instant ATS analysis."
-    )
+    st.info("💡 Upload your PDF resume and paste the target job description to run an instant ATS analysis.")
     st.markdown("---")
 
     custom_groq_key = st.text_input(
@@ -133,17 +127,13 @@ with st.sidebar:
     st.markdown("### 🛠️ Developer Console")
     st.caption("Internal telemetry for system monitoring.")
 
-
 if not groq_api_key:
     st.error(
-        "🔑 Groq API key missing. Configure GROQ_API_KEY inside "
-        ".streamlit/secrets.toml"
+        "🔑 Groq API key missing. Configure GROQ_API_KEY inside .streamlit/secrets.toml"
     )
     st.stop()
 
-
 client = Groq(api_key=groq_api_key)
-
 
 # --- PDF EXTRACTION FUNCTION ---
 def extract_pdf_text(uploaded_file):
@@ -159,9 +149,38 @@ def extract_pdf_text(uploaded_file):
     return text
 
 
+# --- ATS SCORE EXTRACTION ---
+def extract_ats_score(result_text):
+    """
+    Extract the ATS percentage from the Groq response.
+    Example:
+    Overall ATS Match Score: 90%
+    """
+
+    patterns = [
+        r"Overall ATS Match Score:\s*\[?(\d{1,3})\]?\s*%",
+        r"Overall ATS Match Score.*?(\d{1,3})\s*%",
+        r"ATS Match Score.*?(\d{1,3})\s*%"
+    ]
+
+    for pattern in patterns:
+        match = re.search(
+            pattern,
+            result_text,
+            re.IGNORECASE
+        )
+
+        if match:
+            score = int(match.group(1))
+
+            if 0 <= score <= 100:
+                return score
+
+    return None
+
+
 # --- DYNAMIC FALLBACK MECHANISM ---
 def get_working_model():
-
     preferred = [
         "llama-3.3-70b-versatile",
         "llama-3.1-70b-versatile",
@@ -181,8 +200,7 @@ def get_working_model():
                 return pref
 
         valid_models = [
-            m
-            for m in available
+            m for m in available
             if "whisper" not in m
             and "vision" not in m
         ]
@@ -198,31 +216,26 @@ def get_working_model():
 
 active_model = get_working_model()
 
-
 # --- DEVELOPER CONSOLE TELEMETRY ---
 with st.sidebar:
     st.code(
-        f"Active Model: {active_model}\n"
-        f"Engine Status: Ready",
+        f"Active Model: {active_model}\nEngine Status: Ready",
         language="text"
     )
-
 
 # --- 4. HEADER ---
 st.markdown("""
     <div class="main-header">
         <h1>⚡ AI Resume Intelligence Platform</h1>
-        <p>
-            Real-time ATS Score Diagnostic, Keyword Gap Analysis
-            & Impact Rewrites
-        </p>
+        <p>Real-time ATS Score Diagnostic, Keyword Gap Analysis & Impact Rewrites</p>
     </div>
 """, unsafe_allow_html=True)
 
-
 # --- 5. USER INPUTS ---
-col_left, col_right = st.columns([1, 1], gap="large")
-
+col_left, col_right = st.columns(
+    [1, 1],
+    gap="large"
+)
 
 with col_left:
     st.subheader("1. Upload Candidate Resume")
@@ -231,7 +244,6 @@ with col_left:
         "Upload PDF Resume",
         type=["pdf"]
     )
-
 
 with col_right:
     st.subheader("2. Target Job Description")
@@ -242,9 +254,7 @@ with col_right:
         placeholder="Paste the job description here..."
     )
 
-
 st.markdown("<br>", unsafe_allow_html=True)
-
 
 # --- 6. EXECUTION ENGINE ---
 if st.button(
@@ -255,7 +265,7 @@ if st.button(
     if not uploaded_resume or not job_description.strip():
 
         st.error(
-            "Please upload a PDF resume and enter a job description."
+            "Please upload a PDF resume and enter a target job description."
         )
 
     else:
@@ -266,9 +276,9 @@ if st.button(
 
             try:
 
-                # -----------------------------------------
+                # -----------------------------
                 # PDF PROCESSING
-                # -----------------------------------------
+                # -----------------------------
                 raw_resume_text = extract_pdf_text(
                     uploaded_resume
                 )
@@ -282,14 +292,11 @@ if st.button(
                     round(word_count / 200)
                 )
 
-
-                # -----------------------------------------
-                # GROQ AI PROMPT
-                # -----------------------------------------
+                # -----------------------------
+                # GROQ PROMPT
+                # -----------------------------
                 prompt = f"""
-                You are an HR ATS Specialist.
-                Analyze this Resume against the Job Description.
-                Be concise.
+                You are an HR ATS Specialist. Analyze this Resume against the Job Description. Be concise.
 
                 JOB DESCRIPTION:
                 {job_description[:2000]}
@@ -298,7 +305,6 @@ if st.button(
                 {raw_resume_text[:3000]}
 
                 Provide output in exact Markdown structure below:
-
                 ## Overall ATS Match Score: [Insert Score]%
 
                 ### 🌟 Key Candidate Strengths
@@ -314,10 +320,9 @@ if st.button(
                 - **Optimized**: [Action-Oriented ATS Rewritten Bullet]
                 """
 
-
-                # -----------------------------------------
+                # -----------------------------
                 # GROQ ANALYSIS
-                # -----------------------------------------
+                # -----------------------------
                 completion = client.chat.completions.create(
                     model=active_model,
                     messages=[
@@ -330,10 +335,6 @@ if st.button(
                     max_tokens=500
                 )
 
-
-                # -----------------------------------------
-                # SUCCESSFUL RESPONSE
-                # -----------------------------------------
                 if completion and completion.choices:
 
                     result_text = (
@@ -343,65 +344,49 @@ if st.button(
                         .content
                     )
 
-
-                    # -----------------------------------------
+                    # -----------------------------
                     # EXTRACT ATS SCORE
-                    # -----------------------------------------
-                    score_match = re.search(
-                        r"Overall ATS Match Score:\s*(\d+)",
-                        result_text,
-                        re.IGNORECASE
+                    # -----------------------------
+                    ats_score = extract_ats_score(
+                        result_text
                     )
 
-                    ats_score = (
-                        int(score_match.group(1))
-                        if score_match
-                        else None
-                    )
-
-
-                    # -----------------------------------------
-                    # SUPABASE ANALYTICS
-                    # -----------------------------------------
-                    # We store ONLY anonymous analytics:
-                    #
-                    # - Word count
-                    # - ATS score
-                    # - Success status
-                    #
-                    # We DO NOT store:
-                    # - Resume PDF
-                    # - Resume text
-                    # - Job description
-                    # - Name
-                    # - Email
-
-                    log_analysis_event(
+                    # -----------------------------
+                    # SAVE ANALYTICS
+                    # -----------------------------
+                    analytics_saved = log_analysis_event(
                         word_count=word_count,
                         ats_score=ats_score,
-                        status="success"
+                        status="success",
+                        error_message=None
                     )
 
-
-                    # -----------------------------------------
-                    # USER SUCCESS MESSAGE
-                    # -----------------------------------------
+                    # -----------------------------
+                    # SUCCESS MESSAGE
+                    # -----------------------------
                     st.success(
                         "Diagnostic Analysis Complete!"
                     )
 
+                    if analytics_saved:
+                        st.sidebar.success(
+                            "📊 Analytics event saved."
+                        )
+                    else:
+                        st.sidebar.warning(
+                            "⚠️ Analysis worked, but analytics could not be saved."
+                        )
+
                     st.markdown("---")
 
-
-                    # -----------------------------------------
-                    # CLEAN USER-FACING METRICS
-                    # -----------------------------------------
+                    # -----------------------------
+                    # USER METRICS
+                    # -----------------------------
                     m1, m2, m3 = st.columns(3)
-
 
                     with m1:
                         st.markdown(
-                            f"""
+                            f'''
                             <div class="user-metric-card">
                                 <div class="user-metric-value">
                                     {word_count}
@@ -410,14 +395,13 @@ if st.button(
                                     Resume Word Count
                                 </div>
                             </div>
-                            """,
+                            ''',
                             unsafe_allow_html=True
                         )
 
-
                     with m2:
                         st.markdown(
-                            f"""
+                            f'''
                             <div class="user-metric-card">
                                 <div class="user-metric-value">
                                     ~{est_read_time} min
@@ -426,14 +410,13 @@ if st.button(
                                     Recruiter Read Time
                                 </div>
                             </div>
-                            """,
+                            ''',
                             unsafe_allow_html=True
                         )
 
-
                     with m3:
                         st.markdown(
-                            """
+                            '''
                             <div class="user-metric-card">
                                 <div class="user-metric-value">
                                     PDF Parsed
@@ -442,17 +425,15 @@ if st.button(
                                     Document Health
                                 </div>
                             </div>
-                            """,
+                            ''',
                             unsafe_allow_html=True
                         )
 
-
                     st.markdown("<br>", unsafe_allow_html=True)
 
-
-                    # -----------------------------------------
+                    # -----------------------------
                     # OUTPUT TABS
-                    # -----------------------------------------
+                    # -----------------------------
                     t1, t2 = st.tabs(
                         [
                             "📊 Diagnostic Report",
@@ -460,42 +441,35 @@ if st.button(
                         ]
                     )
 
-
                     with t1:
                         st.markdown(result_text)
 
-
                     with t2:
                         st.info(
-                            "Incorporate the highlighted missing "
-                            "keywords directly into your work "
-                            "experience bullet points to improve "
-                            "your ATS parsing score."
+                            "Incorporate the highlighted missing keywords directly into your work experience bullet points to improve your ATS parsing score."
                         )
-
 
                 else:
 
-                    # -----------------------------------------
-                    # NO RESPONSE
-                    # -----------------------------------------
+                    # -----------------------------
+                    # LOG FAILED ANALYSIS
+                    # -----------------------------
                     log_analysis_event(
                         word_count=0,
                         ats_score=None,
                         status="failed",
-                        error_message="No response received from Groq engine."
+                        error_message="No response received from Groq."
                     )
 
                     st.error(
                         "No response received from the engine."
                     )
 
-
             except Exception as e:
 
-                # -----------------------------------------
-                # ERROR ANALYTICS
-                # -----------------------------------------
+                # -----------------------------
+                # LOG ERROR
+                # -----------------------------
                 try:
                     log_analysis_event(
                         word_count=0,
@@ -505,7 +479,6 @@ if st.button(
                     )
                 except Exception:
                     pass
-
 
                 st.error(
                     f"Error processing document: {e}"
