@@ -344,26 +344,31 @@ if st.button(
                         .content
                     )
 
-                    # -----------------------------
-                    # EXTRACT ATS SCORE
-                    # -----------------------------
-                    ats_score = extract_ats_score(
-                        result_text
-                    )
+                                         # --- SUPABASE ANALYTICS ---
+                    try:
+                        import re
 
-                    # -----------------------------
-                    # SAVE ANALYTICS
-                    # -----------------------------
-                    analytics_saved = log_analysis_event(
-                        word_count=word_count,
-                        ats_score=ats_score,
-                        status="success",
-                        error_message=None
-                    )
+                        score_match = re.search(
+                            r"Overall ATS Match Score:\s*(\d+)",
+                            result_text
+                        )
 
-                    # -----------------------------
-                    # SUCCESS MESSAGE
-                    # -----------------------------
+                        ats_score = (
+                            int(score_match.group(1))
+                            if score_match
+                            else None
+                        )
+
+                        log_analysis_event(
+                            word_count=word_count,
+                            ats_score=ats_score,
+                            status="success"
+                        )
+
+                    except Exception as analytics_error:
+                        print(
+                            f"Analytics logging failed: {analytics_error}"
+                        )
                     st.success(
                         "Diagnostic Analysis Complete!"
                     )
