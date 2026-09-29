@@ -144,43 +144,43 @@ def save_analytics(
     try:
 
         supabase_url = st.secrets.get("SUPABASE_URL")
-        supabase_key = st.secrets.get("SUPABASE_SECRET_KEY")
 
-        if not supabase_url or not supabase_key:
-            print(
-                "Supabase analytics is not configured. "
-                "Missing SUPABASE_URL or SUPABASE_SECRET_KEY."
-            )
-            return False
+        supabase_key = (
+            st.secrets.get("SUPABASE_SECRET_KEY")
+            or st.secrets.get("SUPABASE_KEY")
+        )
+
+        if not supabase_url:
+            return False, "Missing SUPABASE_URL in Streamlit Secrets."
+
+        if not supabase_key:
+            return False, "Missing SUPABASE_SECRET_KEY in Streamlit Secrets."
 
         supabase = create_client(
             supabase_url,
             supabase_key
         )
 
-        data = {
-            "word_count": int(word_count),
-            "ats_score": ats_score,
-            "status": status,
-            "error_message": error_message
-        }
-
-        supabase \
-            .table("analysis_events") \
-            .insert(data) \
+        response = (
+            supabase
+            .table("analysis_events")
+            .insert({
+                "word_count": int(word_count),
+                "ats_score": ats_score,
+                "status": status,
+                "error_message": error_message
+            })
+            .select(
+                "id, created_at, word_count, ats_score, status"
+            )
             .execute()
+        )
 
-        print("Supabase analytics saved successfully.")
-
-        return True
+        return True, response.data
 
     except Exception as e:
 
-        print(
-            f"Supabase analytics error: {e}"
-        )
-
-        return False
+        return False, str(e)
 
 
 # ============================================================
@@ -561,7 +561,7 @@ Give a realistic ATS match score based on the actual overlap between the resume 
             # SAVE TO SUPABASE
             # =================================================
 
-            analytics_saved = save_analytics(
+            analytics_saved, analytics_result = save_analytics(
                 word_count=word_count,
                 ats_score=ats_score,
                 status="success"
@@ -583,15 +583,14 @@ Give a realistic ATS match score based on the actual overlap between the resume 
 
             if analytics_saved:
 
-                st.caption(
-                    "✓ Anonymous usage analytics recorded."
+                st.success(
+                    "✓ Analytics saved successfully."
                 )
 
             else:
 
-                st.caption(
-                    "Analytics could not be recorded. "
-                    "The analysis itself completed successfully."
+                st.error(
+                    f"Supabase analytics error: {analytics_result}"
                 )
 
 
@@ -681,7 +680,7 @@ Give a realistic ATS match score based on the actual overlap between the resume 
         # SAVE FAILURE TO SUPABASE
         # ====================================================
 
-        analytics_saved = save_analytics(
+        analytics_saved, analytics_result = save_analytics(
             word_count=word_count,
             ats_score=None,
             status="failed",
@@ -696,6 +695,12 @@ Give a realistic ATS match score based on the actual overlap between the resume 
         st.error(
             f"Error processing document: {e}"
         )
+
+        if not analytics_saved:
+
+            st.error(
+                f"Supabase analytics error: {analytics_result}"
+            )
 
 
 # ============================================================
