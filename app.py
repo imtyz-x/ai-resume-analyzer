@@ -535,26 +535,29 @@ Give a realistic ATS match score based on the actual overlap between the resume 
                 )
 
 
-            # =================================================
-            # EXTRACT ATS SCORE
-            # =================================================
+           # =================================================
+# EXTRACT ATS SCORE
+# =================================================
 
-            score_match = re.search(
-                r"Overall ATS Match Score:\s*(\d+)\s*%",
-                result_text,
-                re.IGNORECASE
-            )
+score_patterns = [
+    r"Overall ATS Match Score\s*:\s*\**\s*(\d{1,3})\s*%",
+    r"ATS Match Score\s*:\s*\**\s*(\d{1,3})\s*%",
+    r"ATS Score\s*:\s*\**\s*(\d{1,3})\s*%",
+]
 
+ats_score = None
 
-            if score_match:
+for pattern in score_patterns:
 
-                ats_score = int(
-                    score_match.group(1)
-                )
+    score_match = re.search(
+        pattern,
+        result_text,
+        re.IGNORECASE
+    )
 
-            else:
-
-                ats_score = None
+    if score_match:
+        ats_score = int(score_match.group(1))
+        break
 
 
             # =================================================
